@@ -1,4 +1,4 @@
-### HS256 Test
+### RS256 Test
 _Login using username and password to retrieve a token._
 ```
 curl --data "user=john&pass=doe" http://localhost:3000/login

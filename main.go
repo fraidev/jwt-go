@@ -1,6 +1,10 @@
 package main
 
 import (
+	"crypto/rsa"
+	"fmt"
+	"log"
+	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -9,8 +13,26 @@ import (
 	jwtware "github.com/gofiber/jwt/v2"
 )
 
+var (
+	// Obviously, this is just a test example. Do not do this in production.
+	// In production, you would have the private key and public key pair generated
+	// in advance. NEVER add a private key to any GitHub repo.
+	privateKey *rsa.PrivateKey
+)
+
 func main() {
 	app := fiber.New()
+
+    dir, err := os.Getwd()
+    if err != nil {
+            log.Fatal(err)
+    }
+    fmt.Println(dir)
+	
+	privateKey, err = rsaConfigSetup(dir + "/private.pem", dir + "/public.pem")
+	if err != nil {
+		log.Fatalf("rsa.GenerateKey: %v", err)
+	}
 
 	// Login route
 	app.Post("/login", login)
@@ -18,9 +40,12 @@ func main() {
 	// Unauthenticated route
 	app.Get("/", accessible)
 
+	pub := privateKey.Public();
+
 	// JWT Middleware
 	app.Use(jwtware.New(jwtware.Config{
-		SigningKey: []byte("secret"),
+		SigningMethod: "RS256",
+		SigningKey:    pub,
 	}))
 
 	// Restricted Routes
@@ -39,7 +64,7 @@ func login(c *fiber.Ctx) error {
 	}
 
 	// Create token
-	token := jwt.New(jwt.SigningMethodHS256)
+	token := jwt.New(jwt.SigningMethodRS256)
 
 	// Set claims
 	claims := token.Claims.(jwt.MapClaims)
@@ -48,8 +73,9 @@ func login(c *fiber.Ctx) error {
 	claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
 
 	// Generate encoded token and send it as response.
-	t, err := token.SignedString([]byte("secret"))
+	t, err := token.SignedString(privateKey)
 	if err != nil {
+		log.Printf("token.SignedString: %v", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
